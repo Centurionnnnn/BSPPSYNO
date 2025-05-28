@@ -1,0 +1,2304 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestionnaire de Véhicules Pompiers (Tableau Catégorisé avec Interventions)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Styles personnalisés pour la police Inter et la mise en page générale */
+        body {
+            font-family: 'Inter', sans-serif;
+            /* Utilisation du logo BSPP comme image de fond principale */
+            background-image: url('https://upload.wikimedia.org/wikipedia/commons/thumb/c/c9/Logo_BSPP.svg/1200px-Logo_BSPP.svg.png');
+            background-size: cover; /* Couvre toute la zone */
+            background-position: center; /* Centre l'image */
+            background-repeat: no-repeat; /* Empêche la répétition */
+            background-attachment: fixed;
+            background-color: #1a1a1a; /* Couleur de fond très sombre (noir) pour les zones non couvertes ou en cas de problème de chargement */
+            
+            /* Ajout d'un overlay sombre pour améliorer la lisibilité du texte */
+            position: relative; /* Nécessaire pour le pseudo-élément */
+            z-index: 0; /* Assure que le pseudo-élément est en dessous du contenu */
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+            color: #e0e0e0; /* Couleur de texte claire pour une meilleure lisibilité sur fond sombre */
+        }
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.3); /* Overlay semi-transparent noir, opacité réduite pour mieux voir le logo */
+            z-index: -1; /* Place l'overlay derrière le contenu mais devant l'image de fond */
+        }
+
+        .container {
+            background-color: #2a2a2a; /* Fond du conteneur légèrement plus clair que le body */
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3); /* Ombre plus prononcée sur fond sombre */
+            padding: 30px;
+            width: 95%; /* Utilise 95% de la largeur disponible */
+            max-width: none; /* Supprime la largeur maximale fixe */
+            margin-top: 20px;
+            z-index: 1; /* Assure que le conteneur est au-dessus de l'overlay */
+        }
+        .header-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 15px 20px;
+            background-color: #3a3a3a; /* Fond sombre pour l'en-tête */
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            flex-wrap: wrap; /* Pour la responsivité */
+            gap: 10px; /* Espace entre les éléments */
+        }
+        .header-info > div {
+            flex-grow: 1;
+            text-align: center;
+            min-width: 150px; /* Taille minimale pour les éléments */
+        }
+        .header-info h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #81c784; /* Vert clair pour les titres */
+            margin-bottom: 5px;
+        }
+        .header-info p {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #a5d6a7; /* Vert encore plus clair */
+        }
+
+        .category-section {
+            background-color: #333333; /* Fond sombre pour les sections de catégorie */
+            border: 1px solid #444444;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+        .category-section h2 {
+            font-size: 1.75rem; /* 28px */
+            font-weight: 700;
+            color: #e0e0e0; /* Texte clair */
+            margin-bottom: 15px;
+            border-bottom: 2px solid #555555;
+            padding-bottom: 10px;
+        }
+        table {
+            width: 100%; /* Assure que le tableau prend toute la largeur disponible */
+            border-collapse: separate;
+            border-spacing: 0;
+            margin-top: 15px;
+            table-layout: auto; /* Permet aux colonnes de s'ajuster */
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #444444; /* Bordure plus foncée */
+            border-right: 1px solid #444444; /* Bordure plus foncée */
+            white-space: nowrap; /* Empêche le texte de se casser sur plusieurs lignes par default */
+            color: #e0e0e0; /* Texte clair pour les cellules */
+        }
+        th {
+            background-color: #4a4a4a; /* Fond sombre pour les en-têtes de tableau */
+            font-weight: 600;
+            color: #ffffff; /* Texte blanc */
+            text-transform: uppercase;
+            font-size: 0.875rem;
+        }
+        tr:last-child td {
+            border-bottom: none;
+        }
+        tr td:last-child, th:last-child {
+            border-right: none;
+        }
+
+        /* Coins arrondis pour le tableau */
+        table th:first-child { border-top-left-radius: 8px; }
+        table th:last-child { border-top-right-radius: 8px; }
+        table tr:last-child td:first-child { border-bottom-left-radius: 8px; }
+        table tr:last-child td:last-child { border-bottom-right-radius: 8px; }
+
+        /* Largeur spécifique pour la colonne d'adresse */
+        th:nth-child(4), td:nth-child(4) { /* Cible la 4ème colonne (Adresse d'intervention) */
+            min-width: 250px; /* Largeur minimale pour l'adresse */
+            white-space: normal; /* Permet à l'adresse de se casser sur plusieurs lignes si nécessaire */
+        }
+
+        /* Couleurs de statut */
+        .status-available { background-color: #1a5a2a; color: #dcfce7; } /* Vert foncé, texte très clair */
+        .status-intervention { background-color: #6a5a1a; color: #fef9c3; } /* Jaune-orange foncé, texte très clair */
+        .status-return { background-color: #5a1a1a; color: #fee2e2; } /* Rouge foncé, texte très clair */
+        .status-maintenance { background-color: #1a3a5a; color: #e0f2fe; } /* Bleu foncé, texte très clair */
+
+        /* Styles pour la deuxième page (carte) */
+        .map-container {
+            position: relative;
+            width: 100%;
+            height: 100%; /* Changed from fixed 700px to 100% */
+            background-color: #2c3e50; /* Couleur de fond pour la carte */
+            border-radius: 8px;
+            overflow: hidden; /* Pour contenir les marqueurs */
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            cursor: grab; /* Curseur pour indiquer que la carte est déplaçable */
+        }
+        .map-container.panning {
+            cursor: grabbing; /* Curseur pendant le déplacement */
+        }
+        .map-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* Couvre le conteneur sans déformer */
+            transform-origin: 0 0; /* Point d'origine pour les transformations (zoom/pan) */
+            transition: transform 0.1s ease-out; /* Animation douce pour les transformations */
+        }
+        .vehicle-map-icon {
+            position: absolute;
+            width: auto; /* Ajuste la largeur au contenu */
+            height: auto; /* Ajuste la hauteur au contenu */
+            background-color: transparent; /* Retire le fond */
+            color: #e0e0e0; /* Couleur de texte claire pour le nom */
+            border-radius: 0; /* Retire les coins arrondis */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem; /* Taille de l'emoji */
+            font-weight: bold;
+            text-align: center;
+            cursor: grab;
+            box-shadow: none; /* Retire l'ombre */
+            border: none; /* Retire la bordure */
+            transform: translate(-50%, -50%); /* Centre l'icône sur les coordonnées */
+            z-index: 10; /* Au-dessus de la carte */
+            transition: transform 0.1s ease-out; /* Animation douce lors du déplacement */
+            padding: 5px; /* Petit padding pour espacer l'emoji et le nom */
+        }
+        .vehicle-map-icon:active {
+            cursor: grabbing;
+            transform: translate(-50%, -50%) scale(1.1); /* Agrandit légèrement lors du glisser */
+        }
+        .vehicle-map-icon span.name {
+            font-size: 0.7rem; /* Taille du nom du véhicule */
+            margin-top: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+            padding: 0 2px;
+            color: #ffffff; /* Couleur de texte blanche pour le nom sur la carte */
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.7); /* Ombre pour améliorer la lisibilité */
+        }
+        .remove-vehicle-button {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background-color: #555; /* Plus visible sur fond sombre */
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: bold;
+            cursor: pointer;
+            border: 1px solid #777;
+            z-index: 11; /* Au-dessus de l'icône du véhicule */
+            transition: background-color 0.2s;
+        }
+        .remove-vehicle-button:hover {
+            background-color: #ef4444;
+        }
+
+        /* Styles pour la barre latérale des véhicules glissables */
+        .draggable-vehicle-category {
+            background-color: #4a4a4a; /* Fond sombre pour les catégories */
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 15px;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.2);
+            flex-grow: 1; /* Permet aux catégories de prendre de l'espace */
+            min-width: 200px; /* Largeur minimale pour éviter un trop grand rétrécissement */
+        }
+        .draggable-vehicle-category h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #e0e0e0;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #666666;
+            padding-bottom: 5px;
+        }
+        .draggable-vehicle-items-container {
+            display: flex;
+            flex-wrap: wrap; /* Permet aux éléments de passer à la ligne */
+            gap: 8px;
+        }
+        .draggable-vehicle-item {
+            background-color: #3a3a3a; /* Fond sombre pour les éléments de la liste */
+            color: #e0e0e0; /* Texte clair pour le contraste */
+            padding: 8px 12px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: grab;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        .draggable-vehicle-item:hover {
+            background-color: #5a5a5a;
+            transform: translateY(-2px);
+        }
+        .draggable-vehicle-item .emoji {
+            font-size: 1.5rem; /* Taille de l'emoji dans la liste */
+            line-height: 1; /* Pour aligner l'emoji */
+        }
+
+        /* Styles pour le diagramme des effectifs */
+        .diagram-bar-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+            color: #e0e0e0; /* Texte clair */
+        }
+        .diagram-bar-label {
+            width: 150px; /* Largeur fixe pour les libellés */
+            font-weight: 600;
+            color: #e0e0e0; /* Texte clair */
+            flex-shrink: 0;
+        }
+        .diagram-bar {
+            height: 25px;
+            background-color: #66bb6a; /* Couleur par default plus claire */
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 10px;
+            color: white;
+            font-weight: bold;
+            transition: width 0.5s ease-out;
+            min-width: 20px; /* Pour que même les petites barres soient visibles */
+        }
+        .diagram-bar.hommesDuRang { background-color: #64b5f6; } /* Bleu plus clair */
+        .diagram-bar.sousOfficiers { background-color: #ffb74d; } /* Orange plus clair */
+        .diagram-bar.officiers { background-color: #ef5350; } /* Rouge plus clair */
+
+        /* Styles pour l'organigramme */
+        .org-chart {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            background-color: #3a3a3a; /* Fond sombre */
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            margin-top: 30px;
+            overflow-x: auto; /* Permet le défilement si l'arbre est trop large */
+            width: 100%;
+        }
+
+        .org-node {
+            background-color: #4a4a4a; /* Fond sombre pour les nœuds */
+            border: 1px solid #666666;
+            border-radius: 8px;
+            padding: 10px 15px;
+            margin: 10px;
+            text-align: center;
+            font-weight: 600;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            min-width: 150px;
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            color: #e0e0e0; /* Texte clair pour les noms de poste */
+        }
+
+        .org-node .assigned-personnel {
+            font-size: 0.8rem;
+            color: #bbbbbb; /* Texte gris clair */
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 4px;
+        }
+
+        .org-node .assigned-personnel .person-tag {
+            background-color: #5a5a5a; /* Fond sombre pour les tags de personne */
+            padding: 2px 6px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            color: #ffffff; /* Texte blanc */
+        }
+
+        .org-node .assigned-personnel .person-tag .remove-person-btn {
+            background: none;
+            border: none;
+            color: #ff8a80; /* Rouge clair */
+            font-size: 0.7rem;
+            cursor: pointer;
+            margin-left: 4px;
+        }
+
+        .org-node .assign-controls {
+            display: flex;
+            gap: 5px;
+            margin-top: 5px;
+            width: 100%;
+            justify-content: center;
+        }
+        .org-node .assign-controls select {
+            flex-grow: 1;
+            padding: 4px;
+            border-radius: 4px;
+            border: 1px solid #777777; /* Bordure plus foncée */
+            font-size: 0.8rem;
+            background-color: #5a5a5a; /* Fond sombre pour les selects */
+            color: #e0e0e0; /* Texte clair */
+        }
+        .org-node .assign-controls button {
+            padding: 4px 8px;
+            border-radius: 4px;
+            background-color: #64b5f6; /* Bleu plus clair */
+            color: white;
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
+
+        .org-level {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap; /* Permet aux éléments de passer à la ligne si nécessaire */
+            margin-top: 20px;
+            position: relative;
+            width: 100%; /* S'assure que le niveau prend toute la largeur */
+        }
+
+        /* Lignes de connexion */
+        .org-node::before {
+            content: '';
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 1px;
+            height: 10px;
+            background-color: #999;
+        }
+
+        .org-level:not(:first-child) .org-node::before {
+            height: 20px; /* Plus long pour les niveaux inférieurs */
+            top: -20px;
+        }
+
+        .org-level::before {
+            content: '';
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: calc(100% - 40px); /* Ligne horizontale entre les parents et enfants */
+            height: 1px;
+            background-color: #999;
+            z-index: 0;
+        }
+
+        .org-level:not(:first-child)::before {
+            top: -20px;
+        }
+        .org-chart .org-level:first-child > .org-node::before {
+            content: none; /* Pas de ligne au-dessus du Colonel */
+        }
+        .org-chart .org-level:first-child::before {
+            content: none; /* Pas de ligne horizontale au-dessus du Colonel */
+        }
+
+        /* Lignes de connexion entre les enfants */
+        .org-level .org-node + .org-node::before {
+            content: '';
+            position: absolute;
+            top: -10px; /* Ajuster la position pour la ligne horizontale */
+            left: 0;
+            transform: none;
+            width: 100%;
+            height: 1px;
+            background-color: transparent; /* Pas de ligne verticale entre frères */
+        }
+
+        /* Ajustements pour les lignes de connexion */
+        .org-node {
+            margin-top: 20px; /* Espace pour les lignes */
+        }
+        .org-level {
+            margin-top: 0; /* Réinitialise la marge du niveau */
+        }
+        .org-level > .org-node {
+            margin-top: 20px; /* Marge pour les nodes dans un niveau */
+        }
+
+        .org-chart-container {
+            width: 100%;
+            overflow-x: auto;
+            padding-bottom: 20px; /* Espace pour le défilement */
+        }
+
+        /* Styles pour les modales */
+        #customMessageModal .bg-white, #customConfirmModal .bg-white {
+            background-color: #2a2a2a; /* Fond sombre pour les modales */
+            color: #e0e0e0; /* Texte clair */
+        }
+        #customMessageModal h3, #customConfirmModal h3 {
+            color: #e0e0e0; /* Titre clair */
+        }
+        #customMessageModal p, #customConfirmModal p {
+            color: #bbbbbb; /* Texte gris clair */
+        }
+        #customConfirmModal .bg-gray-300 {
+            background-color: #5a5a5a; /* Bouton annuler plus sombre */
+            color: #e0e0e0; /* Texte clair */
+        }
+        #customConfirmModal .bg-gray-300:hover {
+            background-color: #6a6a6a;
+        }
+
+
+        /* Ajustements responsifs */
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+            .category-section {
+                padding: 15px;
+            }
+            table, thead, tbody, th, td, tr {
+                display: block;
+            }
+            thead tr {
+                position: absolute;
+                top: -9999px;
+                left: -9999px;
+            }
+            tr { border: 1px solid #ccc; margin-bottom: 15px; border-radius: 8px; }
+            td {
+                border: none;
+                border-bottom: 1px solid #eee;
+                position: relative;
+                padding-left: 50%;
+                text-align: right;
+            }
+            td:before {
+                position: absolute;
+                top: 0;
+                left: 6px;
+                width: 45%;
+                padding-right: 10px;
+                white-space: nowrap;
+                text-align: left;
+                font-weight: bold;
+                color: #555;
+            }
+            /* Libellés de données pour le tableau responsif */
+            td:nth-of-type(1):before { content: "Véhicule"; }
+            td:nth-of-type(2):before { content: "Statut"; }
+            td:nth-of-type(3):before { content: "Type d'intervention"; }
+            td:nth-of-type(4):before { content: "Adresse d'intervention"; }
+            td:nth-of-type(5):before { content: "Personnel Assigné"; }
+            td:nth-of-type(6):before { content: "Chrono"; } /* Nouvelle colonne */
+            td:nth-of-type(7):before { content: "Actions"; }
+
+            .map-container {
+                height: 400px; /* Hauteur réduite sur mobile */
+            }
+            .vehicle-list-sidebar {
+                width: 100%;
+                margin-bottom: 20px;
+            }
+            .org-chart .org-level {
+                flex-direction: column; /* Empile les nœuds verticalement sur mobile */
+                align-items: center;
+            }
+            .org-chart .org-node {
+                margin: 10px 0;
+            }
+            .org-level::before, .org-node::before {
+                display: none; /* Cache les lignes sur mobile pour simplifier */
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="flex justify-center gap-4 mb-8">
+            <button onclick="showPage('mainPage')"
+                    class="bg-blue-600 text-white px-6 py-3 rounded-md shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-200 ease-in-out transform hover:scale-105">
+                Gestion Véhicules & Personnel
+            </button>
+            <button onclick="showPage('mapPage')"
+                    class="bg-blue-600 text-white px-6 py-3 rounded-md shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-200 ease-in-out transform hover:scale-105">
+                Carte des Véhicules
+            </button>
+            <button onclick="showPage('archivePage')"
+                    class="bg-blue-600 text-white px-6 py-3 rounded-md shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-200 ease-in-out transform hover:scale-105">
+                Archives Interventions
+            </button>
+            <button onclick="showPage('personnelDiagramPage')"
+                    class="bg-blue-600 text-white px-6 py-3 rounded-md shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-200 ease-in-out transform hover:scale-105">
+                Diagramme Effectifs
+            </button>
+        </div>
+
+        <div id="mainPage">
+            <h1 class="text-4xl font-extrabold text-center text-gray-100 mb-8">Gestionnaire de Véhicules Pompiers</h1>
+
+            <div class="header-info">
+                <div>
+                    <h2>Heure de Paris</h2>
+                    <p id="parisTime" class="text-2xl font-bold">Chargement...</p>
+                </div>
+                <div>
+                    <h2>Interventions Réalisées</h2>
+                    <p id="totalInterventionsCount" class="text-2xl font-bold">0</p>
+                </div>
+            </div>
+
+            <div class="mb-8 p-6 bg-blue-900 rounded-lg shadow-sm">
+                <h2 class="text-2xl font-semibold text-blue-200 mb-4">Ajouter un Nouveau Véhicule</h2>
+                <div class="flex flex-col sm:flex-row gap-4">
+                    <select id="newVehicleBaseType"
+                            class="flex-grow p-3 border border-blue-700 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out bg-gray-700 text-white"
+                            aria-label="Sélectionner le type de véhicule">
+                        <option value="">Sélectionner un type de véhicule...</option>
+                        </select>
+                    <button onclick="addVehicle()"
+                            class="bg-blue-600 text-white px-6 py-3 rounded-md shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-200 ease-in-out transform hover:scale-105">
+                        Ajouter le Véhicule
+                    </button>
+                </div>
+                <div id="vehicleTypeError" class="text-red-400 text-sm mt-2 hidden">Veuillez sélectionner un type de véhicule.</div>
+            </div>
+
+            <div class="mb-8 p-6 bg-green-900 rounded-lg shadow-sm">
+                <h2 class="text-2xl font-semibold text-green-200 mb-4">Gérer le Personnel</h2>
+                <div class="flex flex-col sm:flex-row gap-4 mb-2">
+                    <input type="text" id="preRegisteredPersonnelName" placeholder="Nom du personnel"
+                           class="flex-grow p-3 border border-purple-700 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200 ease-in-out bg-gray-700 text-white"
+                           aria-label="Nom du personnel">
+                    <select id="preRegisteredPersonnelGrade"
+                            class="p-3 border border-purple-700 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200 ease-in-out bg-gray-700 text-white"
+                            aria-label="Grade du personnel">
+                        </select>
+                    <select id="preRegisteredPersonnelStatus"
+                            class="p-3 border border-purple-700 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200 ease-in-out bg-gray-700 text-white"
+                            aria-label="État initial du personnel">
+                        <option value="Disponible">Disponible</option>
+                        <option value="En service">En service</option>
+                        <option value="En repos">En repos</option>
+                        <option value="En formation">En formation</option>
+                        <option value="En congé">En congé</option>
+                    </select>
+                    <button onclick="addPreRegisteredPersonnel()"
+                            class="bg-purple-600 text-white px-6 py-3 rounded-md shadow-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition duration-200 ease-in-out transform hover:scale-105">
+                        Ajouter Personnel
+                    </button>
+                </div>
+                <div id="preRegisteredPersonnelNameError" class="text-red-400 text-sm mt-2 hidden">Le nom du personnel ne peut pas être vide.</div>
+                
+                <h3 class="text-xl font-medium text-purple-200 mb-2 mt-6">Personnel:</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div id="hommesDuRangList" class="bg-gray-800 p-4 rounded-lg shadow-inner">
+                        <h4 class="text-lg font-semibold text-gray-200 mb-3 border-b pb-2 border-gray-600">Hommes du Rang</h4>
+                        </div>
+                    <div id="sousOfficiersList" class="bg-gray-800 p-4 rounded-lg shadow-inner">
+                        <h4 class="text-lg font-semibold text-gray-200 mb-3 border-b pb-2 border-gray-600">Sous-Officiers</h4>
+                        </div>
+                    <div id="officiersList" class="bg-gray-800 p-4 rounded-lg shadow-inner">
+                        <h4 class="text-lg font-semibold text-gray-200 mb-3 border-b pb-2 border-gray-600">Officiers</h4>
+                        </div>
+                </div>
+            </div>
+
+            <div class="mb-8 text-center">
+                <button onclick="clearAllVehicles()"
+                        class="bg-red-700 text-white px-8 py-3 rounded-md shadow-lg hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2 transition duration-200 ease-in-out transform hover:scale-105">
+                    Effacer Tous les Véhicules
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 gap-6"> <div id="incendieVehiclesContainer" class="category-section">
+                    <h2>Véhicules Incendie</h2>
+                    <div class="rounded-lg shadow-md"> <table class="min-w-full bg-gray-700">
+                            <thead>
+                                <tr>
+                                    <th class="py-3 px-4">Véhicule</th>
+                                    <th class="py-3 px-4">Statut</th>
+                                    <th class="py-3 px-4">Type d'intervention</th>
+                                    <th class="py-3 px-4">Adresse d'intervention</th>
+                                    <th class="py-3 px-4">Personnel Assigné</th>
+                                    <th class="py-3 px-4">Chrono</th>
+                                    <th class="py-3 px-4">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="incendieTableBody">
+                                </tbody>
+                        </table>
+                        <p id="noIncendieVehiclesMessage" class="text-center text-gray-400 py-4 hidden">Aucun véhicule incendie ajouté pour le moment.</p>
+                    </div>
+                </div>
+
+                <div id="secoursVehiclesContainer" class="category-section">
+                    <h2>Secours à Personne</h2>
+                    <div class="rounded-lg shadow-md"> <table class="min-w-full bg-gray-700">
+                            <thead>
+                                <tr>
+                                    <th class="py-3 px-4">Véhicule</th>
+                                    <th class="py-3 px-4">Statut</th>
+                                    <th class="py-3 px-4">Type d'intervention</th>
+                                    <th class="py-3 px-4">Adresse d'intervention</th>
+                                    <th class="py-3 px-4">Personnel Assigné</th>
+                                    <th class="py-3 px-4">Chrono</th>
+                                    <th class="py-3 px-4">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="secoursTableBody">
+                                </tbody>
+                        </table>
+                        <p id="noSecoursVehiclesMessage" class="text-center text-gray-400 py-4 hidden">Aucun véhicule de secours à personne ajouté pour le moment.</p>
+                    </div>
+                </div>
+
+                <div id="commandementVehiclesContainer" class="category-section">
+                    <h2>Véhicules de Commandement</h2>
+                    <div class="rounded-lg shadow-md"> <table class="min-w-full bg-gray-700">
+                            <thead>
+                                <tr>
+                                    <th class="py-3 px-4">Véhicule</th>
+                                    <th class="py-3 px-4">Statut</th>
+                                    <th class="py-3 px-4">Type d'intervention</th>
+                                    <th class="py-3 px-4">Adresse d'intervention</th>
+                                    <th class="py-3 px-4">Personnel Assigné</th>
+                                    <th class="py-3 px-4">Chrono</th>
+                                    <th class="py-3 px-4">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="commandementTableBody">
+                                </tbody>
+                        </table>
+                        <p id="noCommandementVehiclesMessage" class="text-center text-gray-400 py-4 hidden">Aucun véhicule de commandement ajouté pour le moment.</p>
+                    </div>
+                </div>
+
+                <div id="autresVehiclesContainer" class="category-section">
+                    <h2>Autres Véhicules</h2>
+                    <div class="rounded-lg shadow-md"> <table class="min-w-full bg-gray-700">
+                            <thead>
+                                <tr>
+                                    <th class="py-3 px-4">Véhicule</th>
+                                    <th class="py-3 px-4">Statut</th>
+                                    <th class="py-3 px-4">Type d'intervention</th>
+                                    <th class="py-3 px-4">Adresse d'intervention</th>
+                                    <th class="py-3 px-4">Personnel Assigné</th>
+                                    <th class="py-3 px-4">Chrono</th>
+                                    <th class="py-3 px-4">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="autresTableBody">
+                                </tbody>
+                        </table>
+                        <p id="noAutresVehiclesMessage" class="text-center text-gray-400 py-4 hidden">Aucun autre véhicule ajouté pour le moment.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="mapPage" style="display:none;" class="p-8 bg-gray-800 rounded-lg shadow-xl text-gray-100 flex flex-col gap-6"> <h2 class="text-2xl font-semibold text-gray-100 mb-4 text-center">Véhicules Disponibles pour la Carte</h2>
+            <div id="draggableVehiclesList" class="flex flex-wrap justify-center gap-3 bg-gray-700 p-4 rounded-lg shadow-inner overflow-x-auto">
+                <div id="mapIncendieVehicles" class="draggable-vehicle-category">
+                    <h3>Véhicules Incendie</h3>
+                    <div class="draggable-vehicle-items-container" id="mapIncendieItems"></div>
+                    <p id="noMapIncendieVehiclesMessage" class="text-center text-gray-400 text-sm py-2 hidden">Aucun véhicule incendie.</p>
+                </div>
+                <div id="mapSecoursVehicles" class="draggable-vehicle-category">
+                    <h3>Véhicules Secours à Personne</h3>
+                    <div class="draggable-vehicle-items-container" id="mapSecoursItems"></div>
+                    <p id="noMapSecoursVehiclesMessage" class="text-center text-gray-400 text-sm py-2 hidden">Aucun véhicule de secours.</p>
+                </div>
+                <div id="mapCommandementVehicles" class="draggable-vehicle-category">
+                    <h3>Véhicules de Commandement</h3>
+                    <div class="draggable-vehicle-items-container" id="mapCommandementItems"></div>
+                    <p id="noMapCommandementVehiclesMessage" class="text-center text-gray-400 text-sm py-2 hidden">Aucun véhicule de commandement.</p>
+                </div>
+                <div id="mapAutresVehicles" class="draggable-vehicle-category">
+                    <h3>Autres Véhicules</h3>
+                    <div class="draggable-vehicle-items-container" id="mapAutresItems"></div>
+                    <p id="noMapAutresVehiclesMessage" class="text-center text-gray-400 text-sm py-2 hidden">Aucun autre véhicule.</p>
+                </div>
+            </div>
+            <div class="map-area flex-grow">
+                <h2 class="text-2xl font-semibold text-gray-100 mb-4 text-center">Carte des Opérations</h2>
+                <div id="gtaMapContainer" class="map-container"
+                     ondragover="allowDrop(event)" ondrop="dropVehicleOnMap(event)">
+                    <img id="gtaMapImage" src="https://www.bragitoff.com/wp-content/uploads/2015/11/GTAV-HD-MAP-satellite.jpg" alt="Carte de GTA V">
+                    </div>
+            </div>
+        </div>
+
+        <div id="archivePage" style="display:none;" class="p-8 bg-gray-800 rounded-lg shadow-xl text-gray-100">
+            <h1 class="text-4xl font-extrabold text-center text-gray-100 mb-8">Archives des Interventions Réalisées</h1>
+            <div id="archivedInterventionsTableContainer" class="overflow-x-auto rounded-lg shadow-md">
+                <table class="min-w-full bg-gray-700">
+                    <thead>
+                        <tr>
+                            <th class="py-3 px-4">Véhicule</th>
+                            <th class="py-3 px-4">Type d'intervention</th>
+                            <th class="py-3 px-4">Adresse</th>
+                            <th class="py-3 px-4">Personnel</th>
+                            <th class="py-3 px-4">Durée</th>
+                            <th class="py-3 px-4">Heure de Fin</th>
+                        </tr>
+                    </thead>
+                    <tbody id="archivedInterventionsTableBody">
+                        </tbody>
+                </table>
+                <p id="noArchivedInterventionsMessage" class="text-center text-gray-400 py-4 hidden">Aucune intervention archivée pour le moment.</p>
+            </div>
+        </div>
+
+        <div id="personnelDiagramPage" style="display:none;" class="p-8 bg-gray-800 rounded-lg shadow-xl text-gray-100">
+            <h1 class="text-4xl font-extrabold text-center text-gray-100 mb-8">Diagramme des Effectifs par Grade</h1>
+            <div id="personnelDiagramContent" class="mt-8">
+                </div>
+            <p id="noPersonnelMessage" class="text-center text-gray-400 py-4 hidden">Aucun personnel enregistré pour le moment.</p>
+
+            <h2 class="text-3xl font-extrabold text-center text-gray-100 mt-12 mb-8">Organigramme de la Caserne</h2>
+            <div id="organizationalChartContent" class="org-chart-container">
+                </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Tableau pour stocker les véhicules
+        let vehicles = [];
+        // Tableau pour stocker le personnel pré-enregistré (maintenant des objets avec nom, statut et grade)
+        let preRegisteredPersonnel = [];
+        // Compteur total d'interventions
+        let totalInterventions = 0;
+        // Tableau pour stocker les interventions archivées
+        let archivedInterventions = [];
+
+        // Clés pour le stockage local
+        const VEHICLES_STORAGE_KEY = 'gta_rp_firefighter_vehicles_categorized';
+        const PRE_REGISTERED_PERSONNEL_STORAGE_KEY = 'gta_rp_firefighter_pre_registered_personnel';
+        const TOTAL_INTERVENTIONS_STORAGE_KEY = 'gta_rp_firefighter_total_interventions';
+        const ARCHIVED_INTERVENTIONS_STORAGE_KEY = 'gta_rp_firefighter_archived_interventions';
+        const ORGANIZATIONAL_CHART_STORAGE_KEY = 'gta_rp_firefighter_org_chart_personnel';
+
+
+        // Définition des types de véhicules prédéfinis et de leurs catégories
+        const predefinedVehicleTypes = [
+            { baseName: 'VSAV', category: 'secours', description: 'Véhicule de Secours et d\'Assistance aux Victimes', emoji: '🚑' },
+            { baseName: 'FPTL', category: 'incendie', description: 'Fourgon Pompe Tonne Léger', emoji: '🚒' },
+            { baseName: 'FPT', category: 'incendie', description: 'Fourgon Pompe Tonne', emoji: '🚒' },
+            { baseName: 'VL', category: 'commandement', description: 'Véhicule Léger (Officier)', emoji: '🚗' },
+            { baseName: 'VLCG', category: 'commandement', description: 'Véhicule Léger Chef de Groupe', emoji: '🚓' },
+            { baseName: 'EPA', category: 'incendie', description: 'Échelle Pivotante Automatique', emoji: '🪜' },
+            { baseName: 'CCR', category: 'incendie', description: 'Camion Citerne Rural', emoji: '🚒' },
+            { baseName: 'VSR', category: 'secours', description: 'Véhicule de Secours Routier', emoji: '🚨' },
+            { baseName: 'VTU', category: 'autres', description: 'Véhicule Tout Usage', emoji: '🚚' },
+            { baseName: 'CCF', category: 'incendie', description: 'Camion Citerne Feux de Forêts', emoji: '🔥' },
+            { baseName: 'VPL', category: 'commandement', description: 'Véhicule Porte-Lance', emoji: '💦' },
+            { baseName: 'PCM', category: 'commandement', description: 'Poste de Commandement Mobile', emoji: '🏢' },
+            { baseName: 'GRIMP', category: 'secours', description: 'Groupe de Reconnaissance et d\'Intervention en Milieu Périlleux', emoji: '🧗' },
+            { baseName: 'SD', category: 'autres', description: 'Soutien Divers', emoji: '🛠️' },
+            { baseName: 'MIR', category: 'autres', description: 'Mobile d\'Intervention Radiologique', emoji: '🏍️' }, // Ajouté avec emoji moto
+            { baseName: 'Dragon 75', category: 'autres', description: 'Hélicoptère de la Sécurité Civile', emoji: '🚁' }, // Ajouté avec emoji hélicoptère
+            // Ajoutez d'autres types de véhicules ici
+        ];
+
+        // Définition des catégories et de leurs IDs de corps de tableau
+        const vehicleCategories = {
+            incendie: { id: 'incendieTableBody', messageId: 'noIncendieVehiclesMessage', name: 'Véhicules Incendie' },
+            secours: { id: 'secoursTableBody', messageId: 'noSecoursVehiclesMessage', name: 'Secours à Personne' },
+            commandement: { id: 'commandementTableBody', messageId: 'noCommandementVehiclesMessage', name: 'Véhicules de Commandement' },
+            autres: { id: 'autresTableBody', messageId: 'noAutresVehiclesMessage', name: 'Autres Véhicules' }
+        };
+
+        // Types d'intervention par catégorie
+        const interventionTypesByCategory = {
+            incendie: [
+                'Feu d\'habitation', 'Feu de véhicule', 'Feu de forêt', 'Feu de poubelle',
+                'Feu de végétation', 'Incendie industriel', 'Feu de cheminée', 'Feu de cave'
+            ],
+            secours: [
+                'Accident de la route', 'Malaises', 'Chutes', 'Personne bloquée',
+                'Blessé', 'Accouchement', 'Noyade', 'Intoxication', 'Tentative de suicide'
+            ],
+            commandement: [
+                'Gestion d\'opération', 'Reconnaissance', 'Soutien logistique',
+                'Établissement du PC', 'Coordination des moyens'
+            ],
+            autres: [
+                'Divers', 'Nettoyage de voie', 'Fuite de gaz', 'Inondation',
+                'Destruction d\'insectes', 'Sauvetage animal', 'Pollution'
+            ]
+        };
+
+        // Statuts possibles pour le personnel
+        const personnelStatuses = [
+            'Disponible', 'En service', 'En repos', 'En formation', 'En congé'
+        ];
+
+        // Grades de la BSPP et leur catégorie hiérarchique
+        const bsppGrades = [
+            'Sapeur 2ème Classe', 'Sapeur 1ère Classe', 'Caporal', 'Caporal-Chef',
+            'Sergent', 'Sergent-Chef', 'Adjudant', 'Adjudant-Chef',
+            'Lieutenant', 'Capitaine', 'Commandant', 'Lieutenant-Colonel', 'Colonel', 'Général'
+        ];
+
+        const gradeCategories = {
+            'Sapeur 2ème Classe': 'hommesDuRang',
+            'Sapeur 1ère Classe': 'hommesDuRang',
+            'Caporal': 'hommesDuRang',
+            'Caporal-Chef': 'hommesDuRang',
+            'Sergent': 'sousOfficiers',
+            'Sergent-Chef': 'sousOfficiers',
+            'Adjudant': 'sousOfficiers',
+            'Adjudant-Chef': 'sousOfficiers',
+            'Lieutenant': 'officiers',
+            'Capitaine': 'officiers',
+            'Commandant': 'officiers',
+            'Lieutenant-Colonel': 'officiers',
+            'Colonel': 'officiers',
+            'Général': 'officiers'
+        };
+
+        // Structure de l'organigramme de base
+        const baseOrganizationalChartData = {
+            name: 'Colonel de la caserne',
+            personnel: [],
+            children: [
+                {
+                    name: 'Chef de centre',
+                    personnel: [],
+                    children: [
+                        { name: 'Chef de formation incendie', personnel: [] },
+                        { name: 'Chef de formation secours à personne', personnel: [] },
+                        { name: 'Chef de formation opérations diverses', personnel: [] }
+                    ]
+                },
+                {
+                    name: 'Adjoint au chef de centre',
+                    personnel: [],
+                    children: [
+                        {
+                            name: 'Chef de garde (Jour)',
+                            personnel: [],
+                            children: [
+                                {
+                                    name: 'Chef d\'agrès (Engin)',
+                                    personnel: [],
+                                    children: [
+                                        { name: 'Conducteur', personnel: [] },
+                                        { name: 'Équipier', personnel: [] }
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            name: 'Chef de garde (Nuit)',
+                            personnel: [],
+                            children: [
+                                {
+                                    name: 'Chef d\'agrès (Engin)',
+                                    personnel: [],
+                                    children: [
+                                        { name: 'Conducteur', personnel: [] },
+                                        { name: 'Équipier', personnel: [] }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                },
+                { name: 'Chef de service prévention', personnel: [] },
+                { name: 'Chef de service logistique', personnel: [] }
+            ]
+        };
+
+        // Variable pour l'organigramme actuel, qui sera chargé/sauvegardé
+        let currentOrganizationalChart = JSON.parse(JSON.stringify(baseOrganizationalChartData)); // Deep copy for initial state
+
+        // Variable globale pour le timer de mise à jour de l'affichage des chronos
+        let globalTimerInterval = null;
+
+        // Variables d'état pour le zoom et le déplacement de la carte
+        let mapScale = 1;
+        let mapTranslateX = 0;
+        let mapTranslateY = 0;
+        let isPanning = false;
+        let startPanX = 0;
+        let startPanY = 0;
+
+        /**
+         * Génère un ID unique.
+         * @returns {string} Un ID unique.
+         */
+        function generateUniqueId() {
+            return 'id_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+
+        /**
+         * Sauvegarde les données des véhicules, du personnel, le compteur d'interventions et l'organigramme dans le stockage local.
+         */
+        function saveData() {
+            try {
+                localStorage.setItem(VEHICLES_STORAGE_KEY, JSON.stringify(vehicles));
+                localStorage.setItem(PRE_REGISTERED_PERSONNEL_STORAGE_KEY, JSON.stringify(preRegisteredPersonnel));
+                localStorage.setItem(TOTAL_INTERVENTIONS_STORAGE_KEY, totalInterventions.toString());
+                localStorage.setItem(ARCHIVED_INTERVENTIONS_STORAGE_KEY, JSON.stringify(archivedInterventions));
+                localStorage.setItem(ORGANIZATIONAL_CHART_STORAGE_KEY, JSON.stringify(currentOrganizationalChart));
+            } catch (e) {
+                console.error("Erreur lors de la sauvegarde des données :", e);
+            }
+        }
+
+        /**
+         * Fonction récursive pour fusionner le personnel chargé dans la structure de l'organigramme de base.
+         * Cela permet de conserver la structure de base tout en chargeant les affectations.
+         * @param {object} baseNode - Le nœud de l'organigramme de base.
+         * @param {object} loadedNode - Le nœud de l'organigramme chargé depuis le stockage.
+         */
+        function mergePersonnelToOrgChart(baseNode, loadedNode) {
+            if (loadedNode && Array.isArray(loadedNode.personnel)) {
+                baseNode.personnel = loadedNode.personnel;
+            }
+            if (baseNode.children && loadedNode.children) {
+                baseNode.children.forEach((baseChild, index) => {
+                    if (loadedNode.children[index] && baseChild.name === loadedNode.children[index].name) {
+                        mergePersonnelToOrgChart(baseChild, loadedNode.children[index]);
+                    }
+                });
+            }
+        }
+
+        /**
+         * Charge les données des véhicules, du personnel, le compteur d'interventions et l'organigramme depuis le stockage local.
+         */
+        function loadData() {
+            try {
+                const storedVehicles = localStorage.getItem(VEHICLES_STORAGE_KEY);
+                const storedPreRegisteredPersonnel = localStorage.getItem(PRE_REGISTERED_PERSONNEL_STORAGE_KEY);
+                const storedTotalInterventions = localStorage.getItem(TOTAL_INTERVENTIONS_STORAGE_KEY);
+                const storedArchivedInterventions = localStorage.getItem(ARCHIVED_INTERVENTIONS_STORAGE_KEY);
+                const storedOrgChart = localStorage.getItem(ORGANIZATIONAL_CHART_STORAGE_KEY);
+
+                if (storedVehicles) {
+                    vehicles = JSON.parse(storedVehicles);
+                    vehicles.forEach(v => {
+                        if (!v.interventionDetails) {
+                            v.interventionDetails = { startTime: null, lastDuration: null };
+                        }
+                        if (v.mapX === undefined) {
+                            v.mapX = null;
+                            v.mapY = null;
+                        }
+                    });
+                }
+                if (storedPreRegisteredPersonnel) {
+                    preRegisteredPersonnel = JSON.parse(storedPreRegisteredPersonnel);
+                    preRegisteredPersonnel.forEach(p => {
+                        if (typeof p === 'string') {
+                            p = { name: p, status: 'Disponible', grade: 'Sapeur 2ème Classe' };
+                        }
+                        if (!p.status) {
+                            p.status = 'Disponible';
+                        }
+                        if (!p.grade) {
+                            p.grade = 'Sapeur 2ème Classe';
+                        }
+                        // Nouvelle propriété pour l'assignation à l'organigramme
+                        if (p.assignedToOrgNodePath === undefined) {
+                            p.assignedToOrgNodePath = null;
+                        }
+                        // Nouvelle propriété pour l'assignation à un véhicule
+                        if (p.assignedToVehicleId === undefined) {
+                            p.assignedToVehicleId = null;
+                        }
+                    });
+                }
+                if (storedTotalInterventions) {
+                    totalInterventions = parseInt(storedTotalInterventions, 10);
+                }
+                if (storedArchivedInterventions) {
+                    archivedInterventions = JSON.parse(storedArchivedInterventions);
+                }
+                if (storedOrgChart) {
+                    const loadedOrgData = JSON.parse(storedOrgChart);
+                    mergePersonnelToOrgChart(currentOrganizationalChart, loadedOrgData);
+                }
+            } catch (e) {
+                console.error("Erreur lors du chargement des données :", e);
+                vehicles = [];
+                preRegisteredPersonnel = [];
+                totalInterventions = 0;
+                archivedInterventions = [];
+                currentOrganizationalChart = JSON.parse(JSON.stringify(baseOrganizationalChartData));
+            }
+        }
+
+        /**
+         * Met à jour l'affichage du compteur total d'interventions.
+         */
+        function updateTotalInterventionsDisplay() {
+            const counterElement = document.getElementById('totalInterventionsCount');
+            if (counterElement) {
+                counterElement.textContent = totalInterventions;
+            }
+        }
+
+        /**
+         * Met à jour l'heure de Paris en temps réel.
+         */
+        function updateParisTime() {
+            const parisTimeElement = document.getElementById('parisTime');
+            if (parisTimeElement) {
+                const now = new Date();
+                const options = {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    timeZone: 'Europe/Paris'
+                };
+                parisTimeElement.textContent = new Intl.DateTimeFormat('fr-FR', options).format(now);
+            }
+        }
+
+        /**
+         * Remplit la liste déroulante d'ajout de véhicule avec les types prédéfinis.
+         */
+        function populateVehicleTypeDropdown() {
+            const selectElement = document.getElementById('newVehicleBaseType');
+            selectElement.innerHTML = '<option value="">Sélectionner un type de véhicule...</option>'; // Clear existing options
+            predefinedVehicleTypes.forEach(type => {
+                const option = document.createElement('option');
+                option.value = type.baseName;
+                option.textContent = type.baseName + (type.description ? ` (${type.description})` : '');
+                selectElement.appendChild(option);
+            });
+        }
+
+        /**
+         * Remplit la liste déroulante des grades du personnel.
+         */
+        function populatePersonnelGradeDropdown() {
+            const selectElement = document.getElementById('preRegisteredPersonnelGrade');
+            selectElement.innerHTML = ''; // Nettoyer les options existantes
+            bsppGrades.forEach(grade => {
+                const option = document.createElement('option');
+                option.value = grade;
+                option.textContent = grade;
+                selectElement.appendChild(option);
+            });
+        }
+
+        /**
+         * Ajoute un nouveau véhicule à la liste.
+         */
+        function addVehicle() {
+            const newVehicleBaseTypeSelect = document.getElementById('newVehicleBaseType');
+            const vehicleTypeError = document.getElementById('vehicleTypeError');
+            const baseName = newVehicleBaseTypeSelect.value;
+
+            if (!baseName) {
+                vehicleTypeError.classList.remove('hidden');
+                return;
+            } else {
+                vehicleTypeError.classList.add('hidden');
+            }
+
+            const selectedType = predefinedVehicleTypes.find(type => type.baseName === baseName);
+            if (!selectedType) {
+                showMessage("Type de véhicule sélectionné invalide.");
+                return;
+            }
+
+            // Déterminer le prochain numéro disponible pour ce type de véhicule
+            const existingVehiclesOfType = vehicles.filter(v => v.baseName === baseName);
+            const nextNumber = existingVehiclesOfType.length + 1;
+            const vehicleName = `${baseName} ${String(nextNumber).padStart(2, '0')}`; // Ex: VSAV 01, FPTL 02
+
+            const newVehicle = {
+                id: generateUniqueId(),
+                name: vehicleName,
+                baseName: baseName,
+                category: selectedType.category,
+                status: 'Disponible', // Statut initial
+                personnel: [], // Aucun personnel assigné au début
+                interventionType: 'Aucune', // Nouveau champ
+                address: '', // Nouveau champ
+                interventionDetails: { startTime: null, lastDuration: null }, // Détails du chrono
+                mapX: null, // Position X sur la carte (normalisée 0-1)
+                mapY: null  // Position Y sur la carte (normalisée 0-1)
+            };
+            vehicles.push(newVehicle);
+            newVehicleBaseTypeSelect.value = ''; // Réinitialiser le champ
+            saveData();
+            renderVehiclesByCategories(); // Mettre à jour l'affichage du tableau
+            renderVehiclesForMapSidebar(); // Mettre à jour la liste des véhicules sur la carte
+        }
+
+        /**
+         * Ajoute un nouveau membre du personnel.
+         */
+        function addPreRegisteredPersonnel() {
+            const preRegisteredPersonnelNameInput = document.getElementById('preRegisteredPersonnelName');
+            const preRegisteredPersonnelGradeSelect = document.getElementById('preRegisteredPersonnelGrade');
+            const preRegisteredPersonnelStatusSelect = document.getElementById('preRegisteredPersonnelStatus');
+            const preRegisteredPersonnelNameError = document.getElementById('preRegisteredPersonnelNameError');
+            
+            const name = preRegisteredPersonnelNameInput.value.trim();
+            const grade = preRegisteredPersonnelGradeSelect.value;
+            const status = preRegisteredPersonnelStatusSelect.value;
+
+            if (!name) {
+                preRegisteredPersonnelNameError.classList.remove('hidden');
+                return;
+            } else {
+                preRegisteredPersonnelNameError.classList.add('hidden');
+            }
+
+            // Vérifier si le nom existe déjà dans la liste
+            const exists = preRegisteredPersonnel.some(p => p.name === name);
+
+            if (!exists) {
+                preRegisteredPersonnel.push({ name: name, status: status, grade: grade, assignedToVehicleId: null, assignedToOrgNodePath: null });
+                preRegisteredPersonnelNameInput.value = ''; // Réinitialiser le champ
+                preRegisteredPersonnelGradeSelect.value = bsppGrades[0]; // Réinitialiser le grade par default
+                saveData();
+                renderPersonnelByGrade(); // Mettre à jour l'affichage du personnel par grade
+                renderVehiclesByCategories(); // Mettre à jour les listes déroulantes des véhicules
+                renderPersonnelDiagram(); // Mettre à jour le diagramme
+                renderOrganizationalChart(); // Mettre à jour l'organigramme
+            } else {
+                showMessage(`Le personnel "${name}" existe déjà.`);
+            }
+        }
+
+        /**
+         * Supprime un membre du personnel.
+         * @param {string} name - Le nom du personnel à supprimer.
+         */
+        function removePreRegisteredPersonnel(name) {
+            showConfirm("Êtes-vous sûr de vouloir supprimer \"" + name + "\" du personnel ?", () => {
+                preRegisteredPersonnel = preRegisteredPersonnel.filter(p => p.name !== name);
+                // Retirer le personnel de tous les véhicules
+                vehicles.forEach(vehicle => {
+                    vehicle.personnel = vehicle.personnel.filter(p => p !== name);
+                });
+                // Retirer le personnel de l'organigramme
+                removePersonnelFromOrgChart(name);
+                saveData();
+                renderPersonnelByGrade(); // Mettre à jour l'affichage du personnel par grade
+                renderVehiclesByCategories(); // Mettre à jour les listes déroulantes des véhicules
+                renderPersonnelDiagram(); // Mettre à jour le diagramme
+                renderOrganizationalChart(); // Mettre à jour l'organigramme
+            });
+        }
+
+        /**
+         * Met à jour le statut d'un membre du personnel.
+         * @param {string} personnelName - Le nom du personnel.
+         * @param {string} newStatus - Le nouveau statut.
+         */
+        function updatePersonnelStatus(personnelName, newStatus) {
+            const personnelIndex = preRegisteredPersonnel.findIndex(p => p.name === personnelName);
+            if (personnelIndex > -1) {
+                preRegisteredPersonnel[personnelIndex].status = newStatus;
+                saveData();
+                renderPersonnelByGrade(); // Mettre à jour l'affichage du personnel par grade
+            }
+        }
+
+        /**
+         * Met à jour le grade d'un membre du personnel.
+         * @param {string} personnelName - Le nom du personnel.
+         * @param {string} newGrade - Le nouveau grade.
+         */
+        function updatePersonnelGrade(personnelName, newGrade) {
+            const personnelIndex = preRegisteredPersonnel.findIndex(p => p.name === personnelName);
+            if (personnelIndex > -1) {
+                preRegisteredPersonnel[personnelIndex].grade = newGrade;
+                saveData();
+                renderPersonnelByGrade(); // Mettre à jour l'affichage du personnel par grade
+                renderPersonnelDiagram(); // Mettre à jour le diagramme
+            }
+        }
+
+        /**
+         * Met à jour le statut d'un véhicule.
+         * @param {string} vehicleId - L'ID du véhicule.
+         * @param {string} newStatus - Le nouveau statut.
+         */
+        function updateVehicleStatus(vehicleId, newStatus) {
+            const vehicleIndex = vehicles.findIndex(v => v.id === vehicleId);
+            if (vehicleIndex > -1) {
+                const oldStatus = vehicles[vehicleIndex].status;
+                vehicles[vehicleIndex].status = newStatus;
+
+                // Logique d'archivage et d'incrémentation du compteur
+                // Déclenchée si le véhicule passe de "En intervention" à "Disponible" OU "Retour caserne"
+                if (oldStatus === 'En intervention' && (newStatus === 'Disponible' || newStatus === 'Retour caserne') && vehicles[vehicleIndex].interventionDetails.startTime !== null) {
+                    console.log(`Archivage de l'intervention pour le véhicule ${vehicles[vehicleIndex].name} suite au passage à "${newStatus}"`); // Debugging line
+                    const duration = Date.now() - vehicles[vehicleIndex].interventionDetails.startTime;
+                    vehicles[vehicleIndex].interventionDetails.lastDuration = duration;
+                    
+                    // Archiver l'intervention terminée
+                    archivedInterventions.push({
+                        id: generateUniqueId(),
+                        vehicleName: vehicles[vehicleIndex].name,
+                        interventionType: vehicles[vehicleIndex].interventionType,
+                        address: vehicles[vehicleIndex].address,
+                        personnel: [...vehicles[vehicleIndex].personnel], // Copie du tableau de personnel
+                        duration: duration,
+                        completionTime: Date.now()
+                    });
+
+                    vehicles[vehicleIndex].interventionDetails.startTime = null;
+                    totalInterventions++; // Incrémenter le compteur d'interventions
+                    updateTotalInterventionsDisplay(); // Mettre à jour l'affichage du compteur
+                    renderArchivedInterventions(); // Mettre à jour l'archive
+                } else if (newStatus === 'En intervention' && oldStatus !== 'En intervention') {
+                    // Nouvelle intervention commence
+                    vehicles[vehicleIndex].interventionDetails.startTime = Date.now();
+                    vehicles[vehicleIndex].interventionDetails.lastDuration = null; // Réinitialise la dernière durée pour une nouvelle intervention
+                } else if (newStatus !== 'En intervention' && oldStatus === 'En intervention') {
+                    // Si le statut change d'intervention à autre chose que "Disponible" ou "Retour caserne"
+                    // On efface juste l'heure de début sans archiver (par exemple, si on passe directement à "En maintenance" depuis "En intervention")
+                    vehicles[vehicleIndex].interventionDetails.startTime = null; 
+                }
+
+                saveData();
+                renderVehiclesByCategories(); // Mettre à jour l'affichage
+            }
+        }
+
+        /**
+         * Met à jour le type d'intervention d'un véhicule.
+         * @param {string} vehicleId - L'ID du véhicule.
+         * @param {string} newType - Le nouveau type d'intervention.
+         */
+        function updateInterventionType(vehicleId, newType) {
+            const vehicleIndex = vehicles.findIndex(v => v.id === vehicleId);
+            if (vehicleIndex > -1) {
+                vehicles[vehicleIndex].interventionType = newType;
+                saveData();
+            }
+        }
+
+        /**
+         * Met à jour l'adresse d'intervention d'un véhicule.
+         * @param {string} vehicleId - L'ID du véhicule.
+         * @param {string} newAddress - La nouvelle adresse d'intervention.
+         */
+        function updateInterventionAddress(vehicleId, newAddress) {
+            const vehicleIndex = vehicles.findIndex(v => v.id === vehicleId);
+            if (vehicleIndex > -1) {
+                vehicles[vehicleIndex].address = newAddress;
+                saveData();
+            }
+        }
+
+        /**
+         * Assigne un membre du personnel à un véhicule.
+         * @param {string} vehicleId - L'ID du véhicule.
+         * @param {string} personnelName - Le nom du personnel à assigner.
+         */
+        function assignPersonnelToVehicle(vehicleId, personnelName) {
+            if (!personnelName || personnelName === "") {
+                return; // Ne rien faire si aucune sélection
+            }
+
+            const vehicle = vehicles.find(v => v.id === vehicleId);
+            const person = preRegisteredPersonnel.find(p => p.name === personnelName);
+
+            if (vehicle && person) {
+                if (person.status !== 'Disponible') {
+                    showMessage(`Le personnel "${personnelName}" n'est pas disponible (statut: ${person.status}).`);
+                    return;
+                }
+                if (person.assignedToVehicleId !== null) {
+                    showMessage(`Le personnel "${personnelName}" est déjà assigné à un autre véhicule.`);
+                    return;
+                }
+                if (person.assignedToOrgNodePath !== null) {
+                    // Désassigner d'abord de l'organigramme si assigné
+                    unassignPersonnelFromOrgNode(person.assignedToOrgNodePath, personnelName);
+                }
+
+                if (!vehicle.personnel.includes(personnelName)) {
+                    vehicle.personnel.push(personnelName);
+                    person.status = 'En service'; // Mettre à jour le statut
+                    person.assignedToVehicleId = vehicle.id; // Marquer comme assigné à ce véhicule
+                    person.assignedToOrgNodePath = null; // S'assurer qu'il n'est plus assigné à l'organigramme
+                    saveData();
+                    renderVehiclesByCategories(); // Mettre à jour l'affichage
+                    renderOrganizationalChart(); // Mettre à jour l'organigramme
+                } else {
+                    showMessage(`Le personnel "${personnelName}" est déjà assigné à ce véhicule.`);
+                }
+            }
+        }
+
+        /**
+         * Désassigne un membre du personnel d'un véhicule.
+         * @param {string} vehicleId - L'ID du véhicule.
+         * @param {string} personnelName - Le nom du personnel à désassigner.
+         */
+        function unassignPersonnelFromVehicle(vehicleId, personnelName) {
+            const vehicle = vehicles.find(v => v.id === vehicleId);
+            const person = preRegisteredPersonnel.find(p => p.name === personnelName);
+            if (vehicle && person) {
+                vehicle.personnel = vehicle.personnel.filter(p => p !== personnelName);
+                person.status = 'Disponible'; // Rendre disponible
+                person.assignedToVehicleId = null; // Retirer l'assignation au véhicule
+                saveData();
+                renderVehiclesByCategories(); // Mettre à jour l'affichage
+                renderPersonnelByGrade(); // Mettre à jour la liste de personnel
+                renderOrganizationalChart(); // Mettre à jour l'organigramme
+            }
+        }
+
+        /**
+         * Supprime un véhicule.
+         * @param {string} vehicleId - L'ID du véhicule à supprimer.
+         */
+        function deleteVehicle(vehicleId) {
+            showConfirm("Êtes-vous sûr de vouloir supprimer ce véhicule ?", () => {
+                // Libérer le personnel assigné à ce véhicule
+                const vehicleToDelete = vehicles.find(v => v.id === vehicleId);
+                if (vehicleToDelete) {
+                    vehicleToDelete.personnel.forEach(pName => {
+                        const person = preRegisteredPersonnel.find(p => p.name === pName);
+                        if (person) {
+                            person.status = 'Disponible';
+                            person.assignedToVehicleId = null;
+                        }
+                    });
+                }
+
+                vehicles = vehicles.filter(v => v.id !== vehicleId);
+                saveData();
+                renderVehiclesByCategories(); // Mettre à jour l'affichage
+                renderVehiclesForMapSidebar(); // Mettre à jour la liste des véhicules sur la carte
+                renderVehiclesOnMap(); // Mettre à jour les icônes sur la carte
+                renderPersonnelByGrade(); // Mettre à jour la liste de personnel
+            });
+        }
+
+        /**
+         * Efface tous les véhicules.
+         */
+        function clearAllVehicles() {
+            showConfirm("Êtes-vous sûr de vouloir effacer TOUS les véhicules ? Cette action est irréversible.", () => {
+                // Libérer tout le personnel
+                preRegisteredPersonnel.forEach(p => {
+                    p.status = 'Disponible';
+                    p.assignedToVehicleId = null;
+                    p.assignedToOrgNodePath = null;
+                });
+                currentOrganizationalChart = JSON.parse(JSON.stringify(baseOrganizationalChartData)); // Réinitialiser l'organigramme
+                vehicles = [];
+                totalInterventions = 0; // Réinitialiser le compteur d'interventions
+                archivedInterventions = []; // Effacer les archives
+                saveData();
+                updateTotalInterventionsDisplay(); // Mettre à jour l'affichage du compteur
+                renderVehiclesByCategories();
+                renderVehiclesForMapSidebar(); // Mettre à jour la liste des véhicules sur la carte
+                renderVehiclesOnMap(); // Mettre à jour les icônes sur la carte
+                renderArchivedInterventions(); // Mettre à jour l'archive
+                renderPersonnelByGrade(); // Mettre à jour le personnel
+                renderPersonnelDiagram(); // Mettre à jour le diagramme
+                renderOrganizationalChart(); // Mettre à jour l'organigramme
+            });
+        }
+
+        /**
+         * Affiche le personnel trié par grade.
+         */
+        function renderPersonnelByGrade() {
+            // Nettoyer les listes existantes
+            document.getElementById('hommesDuRangList').innerHTML = '<h4 class="text-lg font-semibold text-gray-200 mb-3 border-b pb-2 border-gray-600">Hommes du Rang</h4>';
+            document.getElementById('sousOfficiersList').innerHTML = '<h4 class="text-lg font-semibold text-gray-200 mb-3 border-b pb-2 border-gray-600">Sous-Officiers</h4>';
+            document.getElementById('officiersList').innerHTML = '<h4 class="text-lg font-semibold text-gray-200 mb-3 border-b pb-2 border-gray-600">Officiers</h4>';
+
+            const hommesDuRangDiv = document.getElementById('hommesDuRangList');
+            const sousOfficiersDiv = document.getElementById('sousOfficiersList');
+            const officiersDiv = document.getElementById('officiersList');
+
+            if (preRegisteredPersonnel.length === 0) {
+                hommesDuRangDiv.innerHTML += '<p class="text-gray-400 text-sm mt-2">Aucun personnel.</p>';
+                sousOfficiersDiv.innerHTML += '<p class="text-gray-400 text-sm mt-2">Aucun personnel.</p>';
+                officiersDiv.innerHTML += '<p class="text-gray-400 text-sm mt-2">Aucun personnel.</p>';
+                return;
+            }
+
+            preRegisteredPersonnel.forEach(person => {
+                const span = document.createElement('div');
+                span.className = 'bg-purple-900 text-purple-200 px-3 py-2 rounded-md flex flex-wrap items-center gap-2 text-sm mb-2';
+
+                const statusOptionsHtml = personnelStatuses.map(status => `
+                    <option value="${status}" ${person.status === status ? 'selected' : ''}>
+                        ${status}
+                    </option>
+                `).join('');
+
+                const gradeOptionsHtml = bsppGrades.map(grade => `
+                    <option value="${grade}" ${person.grade === grade ? 'selected' : ''}>
+                        ${grade}
+                    </option>
+                `).join('');
+
+                // Afficher l'affectation actuelle
+                let assignmentInfo = '';
+                if (person.assignedToVehicleId) {
+                    const assignedVehicle = vehicles.find(v => v.id === person.assignedToVehicleId);
+                    if (assignedVehicle) {
+                        assignmentInfo = `<span class="text-xs text-gray-400 ml-2">(Véhicule: ${assignedVehicle.name})</span>`;
+                    }
+                } else if (person.assignedToOrgNodePath) {
+                    const node = getOrgNodeByPath(person.assignedToOrgNodePath.split('-').map(Number));
+                    if (node) {
+                        assignmentInfo = `<span class="text-xs text-gray-400 ml-2">(Poste: ${node.name})</span>`;
+                    }
+                }
+
+
+                span.innerHTML = `
+                    <span class="font-bold">${person.name}</span>
+                    ${assignmentInfo}
+                    <select onchange="updatePersonnelGrade('${person.name}', this.value)"
+                            class="p-1 border border-purple-700 rounded-md bg-gray-700 text-white text-xs focus:ring-purple-500 focus:border-purple-500">
+                        ${gradeOptionsHtml}
+                    </select>
+                    <select onchange="updatePersonnelStatus('${person.name}', this.value)"
+                            class="p-1 border border-purple-700 rounded-md bg-gray-700 text-white text-xs focus:ring-purple-500 focus:border-purple-500">
+                        ${statusOptionsHtml}
+                    </select>
+                    <button onclick="removePreRegisteredPersonnel('${person.name}')" class="text-red-400 hover:text-red-300 focus:outline-none ml-auto" aria-label="Supprimer ${person.name}">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                `;
+
+                const category = gradeCategories[person.grade];
+                if (category === 'hommesDuRang') {
+                    hommesDuRangDiv.appendChild(span);
+                } else if (category === 'sousOfficiers') {
+                    sousOfficiersDiv.appendChild(span);
+                } else if (category === 'officiers') {
+                    officiersDiv.appendChild(span);
+                }
+            });
+        }
+
+        /**
+         * Formate la durée en millisecondes en HH:MM:SS.
+         * @param {number} ms - Durée en millisecondes.
+         * @returns {string} Durée formatée.
+         */
+        function formatDuration(ms) {
+            if (ms === null || isNaN(ms) || ms < 0) return '00:00:00';
+            const seconds = Math.floor(ms / 1000);
+            const h = Math.floor((seconds / 3600));
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = seconds % 60;
+            return [h, m, s].map(v => v.toString().padStart(2, '0')).join(':');
+        }
+
+        /**
+         * Met à jour l'affichage du chrono pour tous les véhicules en intervention.
+         */
+        function updateAllTimersDisplay() {
+            vehicles.forEach(vehicle => {
+                if (vehicle.status === 'En intervention' && vehicle.interventionDetails.startTime !== null) {
+                    const timerDisplayElement = document.getElementById(`timer-display-${vehicle.id}`);
+                    if (timerDisplayElement) {
+                        const elapsed = Date.now() - vehicle.interventionDetails.startTime;
+                        timerDisplayElement.textContent = formatDuration(elapsed);
+                    }
+                }
+            });
+        }
+
+        /**
+         * Rend (affiche) tous les véhicules, triés par catégorie.
+         */
+        function renderVehiclesByCategories() {
+            // Effacer tous les corps de tableau et masquer tous les messages "aucun véhicule"
+            for (const categoryKey in vehicleCategories) {
+                const tableBody = document.getElementById(vehicleCategories[categoryKey].id);
+                tableBody.innerHTML = '';
+                document.getElementById(vehicleCategories[categoryKey].messageId).classList.add('hidden');
+            }
+
+            // Remplir les tableaux par catégorie
+            for (const categoryKey in vehicleCategories) {
+                const currentCategoryVehicles = vehicles.filter(v => v.category === categoryKey);
+                const tableBody = document.getElementById(vehicleCategories[categoryKey].id);
+                const noVehiclesMessage = document.getElementById(vehicleCategories[categoryKey].messageId);
+
+                if (currentCategoryVehicles.length === 0) {
+                    noVehiclesMessage.classList.remove('hidden');
+                } else {
+                    currentCategoryVehicles.forEach(vehicle => {
+                        const row = document.createElement('tr');
+                        row.id = `vehicle-row-${vehicle.id}`;
+
+                        const statusOptions = [
+                            { value: 'Disponible', label: 'Disponible' },
+                            { value: 'En intervention', label: 'En intervention' },
+                            { value: 'Retour caserne', label: 'Retour caserne' },
+                            { value: 'En maintenance', label: 'En maintenance' }
+                        ];
+                        const statusCellClass = getStatusClass(vehicle.status);
+
+                        // Options pour le type d'intervention basées sur la catégorie du véhicule
+                        const interventionOptions = interventionTypesByCategory[vehicle.category] || [];
+                        const interventionOptionsHtml = interventionOptions.map(option => `
+                            <option value="${option}" ${vehicle.interventionType === option ? 'selected' : ''}>
+                                ${option}
+                            </option>
+                        `).join('');
+
+                        // Utiliser les noms du personnel DISPONIBLE pour la liste déroulante d'affectation
+                        const availablePersonnelForAssignment = preRegisteredPersonnel.filter(p => p.status === 'Disponible' && p.assignedToVehicleId === null && p.assignedToOrgNodePath === null).map(p => p.name);
+
+                        const personnelOptionsHtml = availablePersonnelForAssignment
+                            .filter(pName => !vehicle.personnel.includes(pName)) // Ne pas inclure ceux déjà assignés au véhicule
+                            .map(pName => `<option value="${pName}">${pName}</option>`)
+                            .join('');
+
+                        row.innerHTML = `
+                            <td class="whitespace-nowrap font-medium text-gray-100">${vehicle.name}</td>
+                            <td class="${statusCellClass}">
+                                <select onchange="updateVehicleStatus('${vehicle.id}', this.value)"
+                                        class="w-full p-1 border border-gray-600 rounded-md bg-gray-700 text-white focus:ring-blue-500 focus:border-blue-500 transition duration-200 ease-in-out">
+                                    ${statusOptions.map(option => `
+                                        <option value="${option.value}" ${vehicle.status === option.value ? 'selected' : ''}>
+                                            ${option.label}
+                                        </option>
+                                    `).join('')}
+                                </select>
+                            </td>
+                            <td>
+                                <select onchange="updateInterventionType('${vehicle.id}', this.value)"
+                                        class="w-full p-1 border border-gray-600 rounded-md bg-gray-700 text-white text-sm focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="Aucune" ${vehicle.interventionType === 'Aucune' ? 'selected' : ''}>Aucune</option>
+                                    ${interventionOptionsHtml}
+                                </select>
+                            </td>
+                            <td>
+                                <input type="text" value="${vehicle.address}"
+                                       onblur="updateInterventionAddress('${vehicle.id}', this.value)"
+                                       placeholder="Entrer l'adresse"
+                                       class="w-full p-1 border border-gray-600 rounded-md bg-gray-700 text-white text-sm focus:ring-blue-500 focus:border-blue-500">
+                            </td>
+                            <td>
+                                <div class="flex flex-wrap gap-1 mb-2">
+                                    ${vehicle.personnel.length > 0
+                                        ? vehicle.personnel.map(person => `
+                                            <span class="bg-blue-800 text-blue-100 px-2 py-0.5 rounded-full flex items-center gap-1 text-xs">
+                                                ${person}
+                                                <button onclick="unassignPersonnelFromVehicle('${vehicle.id}', '${person}')"
+                                                        class="text-blue-200 hover:text-blue-50 focus:outline-none" aria-label="Désassigner ${person}">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                                </button>
+                                            </span>
+                                        `).join('')
+                                        : '<span class="text-gray-400 text-sm">Aucun</span>'
+                                    }
+                                </div>
+                                <div class="flex gap-1">
+                                    <select id="assignPersonnel-${vehicle.id}"
+                                            class="flex-grow p-1 border border-gray-600 rounded-md bg-gray-700 text-white text-sm focus:ring-blue-500 focus:border-blue-500">
+                                        <option value="">Assigner...</option>
+                                        ${personnelOptionsHtml}
+                                    </select>
+                                    <button onclick="assignPersonnelToVehicle('${vehicle.id}', document.getElementById('assignPersonnel-${vehicle.id}').value)"
+                                            class="bg-blue-500 text-white px-3 py-1 rounded-md text-sm hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                                        +
+                                    </button>
+                                </div>
+                            </td>
+                            <td>
+                                <span id="timer-display-${vehicle.id}" class="text-sm text-gray-300">
+                                    ${vehicle.status === 'Disponible' && vehicle.interventionDetails.lastDuration !== null
+                                        ? `Dernière: ${formatDuration(vehicle.interventionDetails.lastDuration)}`
+                                        : (vehicle.status === 'En intervention' ? formatDuration(Date.now() - vehicle.interventionDetails.startTime) : '')
+                                    }
+                                </span>
+                            </td>
+                            <td>
+                                <button onclick="deleteVehicle('${vehicle.id}')"
+                                        class="bg-red-500 text-white p-2 rounded-md hover:bg-red-600 transition duration-200 ease-in-out"
+                                        aria-label="Supprimer le véhicule">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                </button>
+                            </td>
+                        `;
+                        tableBody.appendChild(row);
+                    });
+                }
+            }
+        }
+
+        /**
+         * Fonctions pour la gestion de la carte
+         */
+
+        /**
+         * Applique les transformations de zoom et de déplacement à l'image de la carte.
+         */
+        function applyMapTransform() {
+            const gtaMapImage = document.getElementById('gtaMapImage');
+            gtaMapImage.style.transform = `translate(${mapTranslateX}px, ${mapTranslateY}px) scale(${mapScale})`;
+            // Re-render vehicle icons to adjust their positions based on new map transform
+            renderVehiclesOnMap();
+        }
+
+        /**
+         * Gère l'événement de la molette de la souris pour le zoom de la carte.
+         * @param {WheelEvent} event - L'événement de la molette.
+         */
+        function handleMapWheel(event) {
+            event.preventDefault(); // Empêche le défilement de la page
+
+            const gtaMapImage = document.getElementById('gtaMapImage');
+            const scaleAmount = 1.1; // Facteur de zoom
+            const rect = gtaMapImage.getBoundingClientRect();
+
+            // Obtenir la position de la souris par rapport à l'image
+            const mouseX = event.clientX - rect.left;
+            const mouseY = event.clientY - rect.top;
+
+            // Calculer les coordonnées actuelles de l'image par rapport à sa taille d'origine
+            const currentImgX = (mouseX - mapTranslateX) / mapScale;
+            const currentImgY = (mouseY - mapTranslateY) / mapScale;
+
+            if (event.deltaY < 0) { // Zoom avant
+                mapScale *= scaleAmount;
+            } else { // Zoom arrière
+                mapScale /= scaleAmount;
+            }
+
+            // Limiter l'échelle à des valeurs raisonnables
+            mapScale = Math.max(0.5, Math.min(3, mapScale)); // Limites : 0.5x à 3x
+
+            // Ajuster la translation pour maintenir le pointeur de la souris fixe sur la carte
+            mapTranslateX = mouseX - currentImgX * mapScale;
+            mapTranslateY = mouseY - currentImgY * mapScale;
+
+            applyMapTransform();
+        }
+
+        /**
+         * Gère l'événement de clic de souris enfoncé pour le déplacement de la carte.
+         * @param {MouseEvent} event - L'événement mousedown.
+         */
+        function handleMapMouseDown(event) {
+            if (event.button === 0) { // Bouton gauche de la souris
+                isPanning = true;
+                startPanX = event.clientX - mapTranslateX;
+                startPanY = event.clientY - mapTranslateY;
+                document.getElementById('gtaMapContainer').classList.add('panning'); // Change le curseur
+            }
+        }
+
+        /**
+         * Gère l'événement de déplacement de la souris pour le déplacement de la carte.
+         * @param {MouseEvent} event - L'événement mousemove.
+         */
+        function handleMapMouseMove(event) {
+            if (!isPanning) return;
+
+            mapTranslateX = event.clientX - startPanX;
+            mapTranslateY = event.clientY - startPanY;
+
+            applyMapTransform();
+        }
+
+        /**
+         * Gère l'événement de relâchement du clic de souris pour arrêter le déplacement de la carte.
+         */
+        function handleMapMouseUp() {
+            isPanning = false;
+            document.getElementById('gtaMapContainer').classList.remove('panning'); // Réinitialise le curseur
+        }
+
+        /**
+         * Rend la liste des véhicules disponibles pour le glisser-déposer sur la carte, triés par catégorie.
+         */
+        function renderVehiclesForMapSidebar() {
+            const mapCategories = {
+                incendie: { containerId: 'mapIncendieItems', messageId: 'noMapIncendieVehiclesMessage' },
+                secours: { containerId: 'mapSecoursItems', messageId: 'noMapSecoursVehiclesMessage' },
+                commandement: { containerId: 'mapCommandementItems', messageId: 'noMapCommandementVehiclesMessage' },
+                autres: { containerId: 'mapAutresItems', messageId: 'noMapAutresVehiclesMessage' }
+            };
+
+            // Clear existing content and hide messages for all categories
+            for (const categoryKey in mapCategories) {
+                document.getElementById(mapCategories[categoryKey].containerId).innerHTML = '';
+                document.getElementById(mapCategories[categoryKey].messageId).classList.add('hidden');
+            }
+
+            // Populate categories
+            for (const categoryKey in mapCategories) {
+                const currentCategoryVehicles = vehicles.filter(v => v.category === categoryKey);
+                const itemsContainer = document.getElementById(mapCategories[categoryKey].containerId);
+                const noVehiclesMessage = document.getElementById(mapCategories[categoryKey].messageId);
+
+                if (currentCategoryVehicles.length === 0) {
+                    noVehiclesMessage.classList.remove('hidden');
+                } else {
+                    currentCategoryVehicles.forEach(vehicle => {
+                        const vehicleItem = document.createElement('div');
+                        vehicleItem.id = `draggable-vehicle-${vehicle.id}`;
+                        vehicleItem.className = 'draggable-vehicle-item';
+                        vehicleItem.draggable = true;
+                        vehicleItem.setAttribute('data-vehicle-id', vehicle.id);
+
+                        // Find the emoji for the vehicle type
+                        const vehicleType = predefinedVehicleTypes.find(type => type.baseName === vehicle.baseName);
+                        const emoji = vehicleType ? vehicleType.emoji : '🚒'; // Default to fire truck if not found
+
+                        vehicleItem.innerHTML = `
+                            <span class="emoji">${emoji}</span>
+                            <span>${vehicle.name}</span>
+                        `;
+
+                        vehicleItem.addEventListener('dragstart', dragVehicle);
+                        itemsContainer.appendChild(vehicleItem);
+                    });
+                }
+            }
+        }
+
+        /**
+         * Gère l'événement dragstart pour un véhicule.
+         * @param {Event} event - L'événement dragstart.
+         */
+        function dragVehicle(event) {
+            event.dataTransfer.setData('text/plain', event.target.getAttribute('data-vehicle-id'));
+        }
+
+        /**
+         * Permet le dépôt sur la carte.
+         * @param {Event} event - L'événement dragover.
+         */
+        function allowDrop(event) {
+            event.preventDefault();
+        }
+
+        /**
+         * Gère l'événement drop sur la carte.
+         * @param {Event} event - L'événement drop.
+         */
+        function dropVehicleOnMap(event) {
+            event.preventDefault();
+            const vehicleId = event.dataTransfer.getData('text/plain');
+            const vehicle = vehicles.find(v => v.id === vehicleId);
+
+            if (vehicle) {
+                const mapContainer = document.getElementById('gtaMapContainer');
+                const mapRect = mapContainer.getBoundingClientRect();
+                const mapImage = document.getElementById('gtaMapImage');
+                const naturalWidth = mapImage.naturalWidth;
+                const naturalHeight = mapImage.naturalHeight;
+
+                // Obtenir la position de la souris par rapport au conteneur de la carte
+                const clientX = event.clientX;
+                const clientY = event.clientY;
+
+                // Calculer la position relative à l'image d'origine (inverse de la transformation)
+                const xOnImage = (clientX - mapRect.left - mapTranslateX) / mapScale;
+                const yOnImage = (clientY - mapRect.top - mapTranslateY) / mapScale;
+
+                // Normaliser ces coordonnées (0-1)
+                vehicle.mapX = xOnImage / naturalWidth;
+                vehicle.mapY = yOnImage / naturalHeight;
+
+                saveData();
+                renderVehiclesOnMap();
+            }
+        }
+
+        /**
+         * Supprime un véhicule de la carte (réinitialise ses coordonnées).
+         * @param {string} vehicleId - L'ID du véhicule à supprimer de la carte.
+         */
+        function removeVehicleFromMap(vehicleId) {
+            const vehicle = vehicles.find(v => v.id === vehicleId);
+            if (vehicle) {
+                showConfirm("Êtes-vous sûr de vouloir retirer ce véhicule de la carte ?", () => {
+                    vehicle.mapX = null;
+                    vehicle.mapY = null;
+                    saveData();
+                    renderVehiclesOnMap(); // Mettre à jour l'affichage des icônes sur la carte
+                });
+            }
+        }
+
+        /**
+         * Rend les icônes des véhicules sur la carte.
+         */
+        function renderVehiclesOnMap() {
+            const mapContainer = document.getElementById('gtaMapContainer');
+            // Supprimer toutes les anciennes icônes de véhicules de la carte
+            mapContainer.querySelectorAll('.vehicle-map-icon').forEach(icon => icon.remove());
+
+            const mapImage = document.getElementById('gtaMapImage');
+            const naturalWidth = mapImage.naturalWidth;
+            const naturalHeight = mapImage.naturalHeight;
+
+            vehicles.forEach(vehicle => {
+                if (vehicle.mapX !== null && vehicle.mapY !== null) {
+                    const icon = document.createElement('div');
+                    icon.id = `map-icon-${vehicle.id}`;
+                    icon.className = 'vehicle-map-icon';
+                    icon.draggable = true;
+                    icon.setAttribute('data-vehicle-id', vehicle.id);
+
+                    // Find the emoji for the vehicle type
+                    const vehicleType = predefinedVehicleTypes.find(type => type.baseName === vehicle.baseName);
+                    const emoji = vehicleType ? vehicleType.emoji : '🚒'; // Default to fire truck if not found
+
+                    icon.innerHTML = `
+                        ${emoji}
+                        <span class="name">${vehicle.name}</span>
+                        <button class="remove-vehicle-button" onclick="removeVehicleFromMap('${vehicle.id}')">X</button>
+                    `;
+
+                    // Positionner l'icône en fonction des coordonnées normalisées, de l'échelle et de la translation
+                    icon.style.left = `${(vehicle.mapX * naturalWidth * mapScale) + mapTranslateX}px`;
+                    icon.style.top = `${(vehicle.mapY * naturalHeight * mapScale) + mapTranslateY}px`;
+
+                    icon.addEventListener('dragstart', dragVehicle);
+                    mapContainer.appendChild(icon);
+                }
+            });
+        }
+
+        /**
+         * Rend les interventions archivées.
+         */
+        function renderArchivedInterventions() {
+            const tableBody = document.getElementById('archivedInterventionsTableBody');
+            const noInterventionsMessage = document.getElementById('noArchivedInterventionsMessage');
+            tableBody.innerHTML = ''; // Nettoyer le tableau
+
+            if (archivedInterventions.length === 0) {
+                noInterventionsMessage.classList.remove('hidden');
+            } else {
+                noInterventionsMessage.classList.add('hidden');
+                // Trier par heure de fin, du plus récent au plus ancien
+                const sortedArchives = [...archivedInterventions].sort((a, b) => b.completionTime - a.completionTime);
+
+                sortedArchives.forEach(intervention => {
+                    const row = document.createElement('tr');
+                    const completionDate = new Date(intervention.completionTime);
+                    const formattedTime = completionDate.toLocaleDateString('fr-FR') + ' ' + completionDate.toLocaleTimeString('fr-FR');
+
+                    row.innerHTML = `
+                        <td class="py-3 px-4 whitespace-nowrap font-medium text-gray-100">${intervention.vehicleName}</td>
+                        <td class="py-3 px-4">${intervention.interventionType}</td>
+                        <td class="py-3 px-4">${intervention.address || 'N/A'}</td>
+                        <td class="py-3 px-4">${intervention.personnel.join(', ') || 'Aucun'}</td>
+                        <td class="py-3 px-4">${formatDuration(intervention.duration)}</td>
+                        <td class="py-3 px-4">${formattedTime}</td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            }
+        }
+
+        /**
+         * Rend le diagramme des effectifs par grade.
+         */
+        function renderPersonnelDiagram() {
+            const diagramContent = document.getElementById('personnelDiagramContent');
+            const noPersonnelMessage = document.getElementById('noPersonnelMessage');
+            diagramContent.innerHTML = ''; // Nettoyer le contenu
+
+            if (preRegisteredPersonnel.length === 0) {
+                noPersonnelMessage.classList.remove('hidden');
+                return;
+            } else {
+                noPersonnelMessage.classList.add('hidden');
+            }
+
+            const counts = {
+                hommesDuRang: { count: 0, label: 'Hommes du Rang', className: 'hommesDuRang' },
+                sousOfficiers: { count: 0, label: 'Sous-Officiers', className: 'sousOfficiers' },
+                officiers: { count: 0, label: 'Officiers', className: 'officiers' }
+            };
+
+            preRegisteredPersonnel.forEach(person => {
+                const category = gradeCategories[person.grade];
+                if (counts[category]) {
+                    counts[category].count++;
+                }
+            });
+
+            const totalPersonnel = preRegisteredPersonnel.length;
+
+            for (const categoryKey in counts) {
+                const categoryData = counts[categoryKey];
+                const percentage = totalPersonnel > 0 ? ((categoryData.count / totalPersonnel) * 100).toFixed(1) : 0;
+
+                const barContainer = document.createElement('div');
+                barContainer.className = 'diagram-bar-container';
+
+                barContainer.innerHTML = `
+                    <div class="diagram-bar-label">${categoryData.label} (${categoryData.count})</div>
+                    <div class="flex-grow bg-gray-600 rounded-md ml-4">
+                        <div class="diagram-bar ${categoryData.className}" style="width: ${percentage}%;">
+                            ${percentage > 0 ? `${percentage}%` : ''}
+                        </div>
+                    </div>
+                `;
+                diagramContent.appendChild(barContainer);
+            }
+        }
+
+        /**
+         * Récupère un nœud de l'organigramme par son chemin.
+         * @param {Array<number>} path - Le chemin vers le nœud (ex: [0, 1, 0]).
+         * @returns {object|null} Le nœud trouvé ou null.
+         */
+        function getOrgNodeByPath(path) {
+            let node = currentOrganizationalChart;
+            for (let i = 0; i < path.length; i++) {
+                if (!node || !node.children || !node.children[path[i]]) {
+                    return null;
+                }
+                node = node.children[path[i]];
+            }
+            return node;
+        }
+
+        /**
+         * Assigne un membre du personnel à un poste de l'organigramme.
+         * @param {string} pathString - Le chemin du nœud sous forme de chaîne (ex: "0-1-0").
+         * @param {string} personnelName - Le nom du personnel à assigner.
+         */
+        function assignPersonnelToOrgNode(pathString, personnelName) {
+            if (!personnelName || personnelName === "") {
+                return;
+            }
+
+            const path = pathString.split('-').map(Number);
+            const node = getOrgNodeByPath(path);
+            const person = preRegisteredPersonnel.find(p => p.name === personnelName);
+
+            if (node && person) {
+                if (person.status !== 'Disponible') {
+                    showMessage(`Le personnel "${personnelName}" n'est pas disponible (statut: ${person.status}).`);
+                    return;
+                }
+                if (person.assignedToVehicleId !== null) {
+                    showMessage(`Le personnel "${personnelName}" est déjà assigné à un véhicule. Désassignez-le d'abord.`);
+                    return;
+                }
+                if (person.assignedToOrgNodePath !== null) {
+                    showMessage(`Le personnel "${personnelName}" est déjà assigné à un autre poste de l'organigramme.`);
+                    return;
+                }
+
+                if (!node.personnel.includes(personnelName)) {
+                    node.personnel.push(personnelName);
+                    person.status = 'En service'; // Mettre à jour le statut
+                    person.assignedToOrgNodePath = pathString; // Marquer comme assigné à ce poste
+                    person.assignedToVehicleId = null; // S'assurer qu'il n'est plus assigné à un véhicule
+                    saveData();
+                    renderOrganizationalChart(); // Mettre à jour l'organigramme
+                    renderVehiclesByCategories(); // Mettre à jour les véhicules (pour les listes d'affectation)
+                    renderPersonnelByGrade(); // Mettre à jour la liste de personnel
+                } else {
+                    showMessage(`Le personnel "${personnelName}" est déjà assigné à ce poste.`);
+                }
+            }
+        }
+
+        /**
+         * Désassigne un membre du personnel d'un poste de l'organigramme.
+         * @param {string} pathString - Le chemin du nœud sous forme de chaîne (ex: "0-1-0").
+         * @param {string} personnelName - Le nom du personnel à désassigner.
+         */
+        function unassignPersonnelFromOrgNode(pathString, personnelName) {
+            const path = pathString.split('-').map(Number);
+            const node = getOrgNodeByPath(path);
+            const person = preRegisteredPersonnel.find(p => p.name === personnelName);
+
+            if (node && person) {
+                node.personnel = node.personnel.filter(p => p !== personnelName);
+                person.status = 'Disponible'; // Rendre disponible
+                person.assignedToOrgNodePath = null; // Retirer l'assignation au poste
+                saveData();
+                renderOrganizationalChart(); // Mettre à jour l'organigramme
+                renderVehiclesByCategories(); // Mettre à jour les véhicules (pour les listes d'affectation)
+                renderPersonnelByGrade(); // Mettre à jour la liste de personnel
+            }
+        }
+
+        /**
+         * Retire un membre du personnel de tous les postes de l'organigramme.
+         * Utile lors de la suppression d'un membre du personnel ou d'une réaffectation.
+         * @param {string} personnelName - Le nom du personnel à retirer.
+         */
+        function removePersonnelFromOrgChart(personnelName) {
+            function traverseAndRemove(node) {
+                if (node && Array.isArray(node.personnel)) {
+                    node.personnel = node.personnel.filter(p => p !== personnelName);
+                }
+                if (node && Array.isArray(node.children)) {
+                    node.children.forEach(child => traverseAndRemove(child));
+                }
+            }
+            traverseAndRemove(currentOrganizationalChart);
+            // Mettre à jour le statut du personnel si ce n'est pas déjà fait par une autre fonction
+            const person = preRegisteredPersonnel.find(p => p.name === personnelName);
+            if (person && person.assignedToOrgNodePath !== null) {
+                person.status = 'Disponible';
+                person.assignedToOrgNodePath = null;
+            }
+        }
+
+        /**
+         * Fonction récursive pour rendre l'organigramme.
+         * @param {object} node - Le nœud actuel de l'organigramme.
+         * @param {Array<number>} path - Le chemin vers ce nœud.
+         * @returns {string} Le HTML du nœud et de ses enfants.
+         */
+        function renderOrgChartNode(node, path) {
+            const pathString = path.join('-');
+            
+            // Personnel actuellement disponible pour l'affectation à un poste de l'organigramme
+            // C'est-à-dire : statut 'Disponible', non assigné à un véhicule, et non assigné à un poste de l'organigramme
+            const availablePersonnel = preRegisteredPersonnel.filter(p => 
+                p.status === 'Disponible' && p.assignedToVehicleId === null && p.assignedToOrgNodePath === null
+            );
+            const personnelOptionsHtml = availablePersonnel
+                .map(p => `<option value="${p.name}">${p.name}</option>`)
+                .join('');
+
+            let childrenHtml = '';
+            if (node.children && node.children.length > 0) {
+                childrenHtml = `
+                    <div class="org-level">
+                        ${node.children.map((child, index) => renderOrgChartNode(child, [...path, index])).join('')}
+                    </div>
+                `;
+            }
+            return `
+                <div class="org-node">
+                    <span class="font-bold">${node.name}</span>
+                    <div class="assigned-personnel">
+                        ${node.personnel.length > 0
+                            ? node.personnel.map(person => `
+                                <span class="person-tag">
+                                    ${person}
+                                    <button class="remove-person-btn" onclick="unassignPersonnelFromOrgNode('${pathString}', '${person}')">X</button>
+                                </span>
+                            `).join('')
+                            : '<span class="text-gray-400 text-xs">Aucun personnel</span>'
+                        }
+                    </div>
+                    <div class="assign-controls">
+                        <select id="assignOrgPersonnel-${pathString}">
+                            <option value="">Assigner...</option>
+                            ${personnelOptionsHtml}
+                        </select>
+                        <button onclick="assignPersonnelToOrgNode('${pathString}', document.getElementById('assignOrgPersonnel-${pathString}').value)">
+                            +
+                        </button>
+                    </div>
+                </div>
+                ${childrenHtml}
+            `;
+        }
+
+        /**
+         * Rend l'organigramme complet.
+         */
+        function renderOrganizationalChart() {
+            const orgChartContainer = document.getElementById('organizationalChartContent');
+            orgChartContainer.innerHTML = ''; // Nettoyer le contenu
+
+            if (currentOrganizationalChart) {
+                const chartHtml = `<div class="org-chart">${renderOrgChartNode(currentOrganizationalChart, [])}</div>`;
+                orgChartContainer.innerHTML = chartHtml;
+            } else {
+                orgChartContainer.innerHTML = '<p class="text-center text-gray-400 py-4">Organigramme non disponible.</p>';
+            }
+        }
+
+
+        /**
+         * Retourne la classe CSS appropriée en fonction du statut du véhicule.
+         * @param {string} status - Le statut du véhicule.
+         * @returns {string} La classe CSS.
+         */
+        function getStatusClass(status) {
+            switch (status) {
+                case 'Disponible':
+                    return 'status-available';
+                case 'En intervention':
+                    return 'status-intervention';
+                case 'Retour caserne':
+                    return 'status-return';
+                case 'En maintenance':
+                    return 'status-maintenance';
+                default:
+                    return '';
+            }
+        }
+
+        // --- Fonctions de message et confirmation personnalisées (remplace alert/confirm) ---
+        let currentModal = null;
+
+        function showMessage(message) {
+            if (currentModal) currentModal.remove(); // Supprime l'ancienne modale si elle existe
+
+            const modalHtml = `
+                <div id="customMessageModal" class="fixed inset-0 bg-gray-900 bg-opacity-70 flex items-center justify-center p-4 z-50">
+                    <div class="bg-gray-800 rounded-lg shadow-xl p-6 max-w-sm w-full">
+                        <h3 class="text-lg font-bold text-gray-100 mb-4">Information</h3>
+                        <p class="text-gray-300 mb-6">${message}</p>
+                        <div class="flex justify-end">
+                            <button id="messageModalOk"
+                                    class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                OK
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            currentModal = document.getElementById('customMessageModal');
+            document.getElementById('messageModalOk').onclick = () => currentModal.remove();
+        }
+
+        function showConfirm(message, onConfirmCallback) {
+            if (currentModal) currentModal.remove(); // Supprime l'ancienne modale si elle existe
+
+            const modalHtml = `
+                <div id="customConfirmModal" class="fixed inset-0 bg-gray-900 bg-opacity-70 flex items-center justify-center p-4 z-50">
+                    <div class="bg-gray-800 rounded-lg shadow-xl p-6 max-w-sm w-full">
+                        <h3 class="text-lg font-bold text-gray-100 mb-4">Confirmation</h3>
+                        <p class="text-gray-300 mb-6">${message}</p>
+                        <div class="flex justify-end gap-3">
+                            <button id="confirmModalCancel"
+                                    class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                                Annuler
+                            </button>
+                            <button id="confirmModalConfirm"
+                                    class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500">
+                                Confirmer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            currentModal = document.getElementById('customConfirmModal');
+
+            document.getElementById('confirmModalConfirm').onclick = () => {
+                currentModal.remove();
+                onConfirmCallback();
+            };
+            document.getElementById('confirmModalCancel').onclick = () => currentModal.remove();
+        }
+
+        /**
+         * Affiche la page spécifiée et masque les autres.
+         * @param {string} pageId - L'ID de la page à afficher ('mainPage', 'mapPage', 'archivePage', 'personnelDiagramPage').
+         */
+        function showPage(pageId) {
+            document.getElementById('mainPage').style.display = 'none';
+            document.getElementById('mapPage').style.display = 'none';
+            document.getElementById('archivePage').style.display = 'none';
+            document.getElementById('personnelDiagramPage').style.display = 'none';
+
+            document.getElementById(pageId).style.display = 'block';
+
+            // Si la page de carte est affichée, rafraîchir les véhicules sur la carte
+            if (pageId === 'mapPage') {
+                renderVehiclesForMapSidebar();
+                renderVehiclesOnMap();
+            } else if (pageId === 'archivePage') {
+                renderArchivedInterventions();
+            } else if (pageId === 'personnelDiagramPage') {
+                renderPersonnelDiagram();
+                renderOrganizationalChart(); // Rendre l'organigramme lorsque cette page est affichée
+            }
+        }
+
+
+        // Charger les données et rendre l'interface utilisateur au chargement de la page
+        window.onload = function() {
+            loadData();
+            populateVehicleTypeDropdown();
+            populatePersonnelGradeDropdown(); // Remplir la liste déroulante des grades
+            renderPersonnelByGrade(); // Afficher le personnel par grade
+            renderVehiclesByCategories();
+            updateTotalInterventionsDisplay(); // Afficher le compteur au chargement
+
+            // Afficher la page principale par default au chargement
+            showPage('mainPage');
+
+            // Démarrer le timer global pour mettre à jour les chronos et l'heure de Paris toutes les secondes
+            globalTimerInterval = setInterval(() => {
+                updateAllTimersDisplay();
+                updateParisTime();
+            }, 1000);
+
+            // Initialiser les écouteurs d'événements de la carte après le chargement de l'image
+            const gtaMapImage = document.getElementById('gtaMapImage');
+            gtaMapImage.onload = () => {
+                applyMapTransform(); // Appliquer la transformation initiale et rendre les icônes
+                gtaMapImage.addEventListener('wheel', handleMapWheel);
+                gtaMapImage.addEventListener('mousedown', handleMapMouseDown);
+                // Ajout des écouteurs sur le document pour un meilleur suivi du glisser-déposer
+                document.addEventListener('mousemove', handleMapMouseMove);
+                document.addEventListener('mouseup', handleMapMouseUp);
+                // Ajoutez un écouteur sur le conteneur de la carte pour arrêter le panoramique si la souris quitte la zone
+                document.getElementById('gtaMapContainer').addEventListener('mouseleave', handleMapMouseUp);
+            };
+            // Si l'image est déjà chargée (en cache), appeler onload manuellement
+            if (gtaMapImage.complete) {
+                gtaMapImage.onload();
+            }
+        };
+    </script>
+</body>
+</html>
